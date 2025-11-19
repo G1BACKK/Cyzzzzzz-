@@ -1,4 +1,5 @@
 import os
+import threading
 import asyncio
 from flask import Flask
 from pyrogram import Client
@@ -9,12 +10,14 @@ SESSION = os.getenv("SESSION")
 
 CHANNEL_ID = -1002893284498
 
-app_flask = Flask(__name__)
+# Flask app
+app = Flask(__name__)
 
-@app_flask.route("/")
+@app.route("/")
 def home():
     return "Bot Running Successfully!"
 
+# Pyrogram client
 pyro = Client(
     "bot",
     api_id=API_ID,
@@ -22,33 +25,35 @@ pyro = Client(
     session_string=SESSION
 )
 
-async def auto_join_live():
+async def join_live_stream():
     await pyro.start()
-    print("🔥 Pyrogram Started")
+    print("🔥 Pyrogram Started Successfully")
 
     while True:
         try:
             chat = await pyro.get_chat(CHANNEL_ID)
 
             if chat.has_live_stream:
-                print("🎥 Live detected! Joining…")
+                print("🎥 Live detected! Joining...")
                 await pyro.join_chat(CHANNEL_ID)
-                print("✅ Joined livestream!")
+                print("✅ Successfully Joined Live Stream!")
             else:
-                print("⛔ No live at the moment")
+                print("⛔ No live currently…")
 
         except Exception as e:
-            print("Error:", e)
+            print("❌ Error:", e)
 
         await asyncio.sleep(10)
 
-async def start_all():
-    task = asyncio.create_task(auto_join_live())
-    await task
+def start_async_loop(loop):
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(join_live_stream())
 
+# Start Pyrogram in its own background thread
+loop = asyncio.new_event_loop()
+threading.Thread(target=start_async_loop, args=(loop,), daemon=True).start()
+
+# Start Flask (main thread)
 if __name__ == "__main__":
-    loop = asyncio.get_event_loop()
-    loop.create_task(start_all())
-
-    # Flask runs on main thread, Pyrogram runs in background
-    app_flask.run(host="0.0.0.0", port=int(os.getenv("PORT", 10000)))
+    port = int(os.getenv("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)
