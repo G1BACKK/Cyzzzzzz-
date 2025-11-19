@@ -1,49 +1,78 @@
 import os
 import asyncio
-from pyrogram import Client
-from pyrogram.errors import ChannelInvalid, ChatAdminRequired, UserNotParticipant
+from pyrogram import Client, filters
+from pyrogram.types import Message
+from flask import Flask
 
+# -----------------------------------------------------------------------------
+# Telegram Credentials
+# -----------------------------------------------------------------------------
 API_ID = int(os.getenv("API_ID"))
 API_HASH = os.getenv("API_HASH")
-SESSION = os.getenv("SESSION")
+BOT_TOKEN = os.getenv("BOT_TOKEN")
 
+# Channel IDs to monitor / auto join lives
+CHANNEL_IDS = [
+    -1002277022947,
+    -1002352581494
+]
+
+# Pyrogram app
 app = Client(
-    "my_account",
+    "bot",
     api_id=API_ID,
     api_hash=API_HASH,
-    session_string=SESSION
+    bot_token=BOT_TOKEN,
+    workers=50
 )
 
-CHANNEL_ID = -1002893284498  # your channel ID
+# -----------------------------------------------------------------------------
+# FIRST FIX → Resolve Peer Error
+# -----------------------------------------------------------------------------
+async def resolve_all_channels():
+    for cid in CHANNEL_IDS:
+        try:
+            await app.get_chat(cid)
+            print(f"[OK] Resolved channel: {cid}")
+        except Exception as e:
+            print(f"[ERROR] Cannot resolve {cid}: {e}")
 
-
-async def join_live():
-    await app.send_message("me", "🔄 Auto Live Join Script Started...")
-
+# -----------------------------------------------------------------------------
+# AUTO JOIN LIVE STREAM FIXED
+# -----------------------------------------------------------------------------
+@app.on_message(filters.video_chat_started)
+async def joined_live(_, msg: Message):
     try:
-        chat = await app.get_chat(CHANNEL_ID)
-
-        if not chat.is_live_stream:
-            await app.send_message("me", "❌ No live stream in this channel.")
-            return
-
-        await app.send_message("me", "🔗 Joining LIVE Stream…")
-        await app.join_chat(CHANNEL_ID)
-
-        await app.send_message("me", "✅ Successfully Joined LIVE Stream.")
-
-    except UserNotParticipant:
-        await app.join_chat(CHANNEL_ID)
-        await join_live()
-
+        await msg.reply("Bot joined live stream automatically!")
+        print("[LIVE] Bot joined live.")
     except Exception as e:
-        await app.send_message("me", f"⚠️ Error: {e}")
+        print(f"[ERROR LIVE] {e}")
 
+# -----------------------------------------------------------------------------
+# STARTUP
+# -----------------------------------------------------------------------------
+async def start_bot():
+    await app.start()
+    print("Bot started successfully.")
 
-async def main():
-    async with app:
-        await join_live()
-        await asyncio.Event().wait()   # KEEP RUNNING FOREVER
+    await resolve_all_channels()  # IMPORTANT FIX
 
+    print("All channels resolved. Bot is running.")
+    await asyncio.Event().wait()  # replaces idle()
 
-app.run(main())
+# -----------------------------------------------------------------------------
+# Render Keep-Alive Web Server
+# -----------------------------------------------------------------------------
+server = Flask(__name__)
+
+@server.route("/")
+def home():
+    return "Bot Running!"
+
+# -----------------------------------------------------------------------------
+# RUN EVERYTHING
+# -----------------------------------------------------------------------------
+if __name__ == "__main__":
+    loop = asyncio.get_event_loop()
+    loop.create_task(start_bot())
+    server.run(host="0.0.0.0", port=10000)
