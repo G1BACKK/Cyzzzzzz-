@@ -21,7 +21,7 @@ pyro = Client(
     api_id=API_ID,
     api_hash=API_HASH,
     session_string=SESSION,
-    workers=0,          # disable update workers
+    workers=1,            # FIX: must be minimum 1
     plugins=None,
     device_model="RenderServer",
     takeout=False,
@@ -39,7 +39,6 @@ async def join_live_loop():
                 print("🎥 LIVE FOUND! Joining…")
                 await pyro.join_chat(CHANNEL_ID)
                 print("✅ Joined Live Stream")
-
             else:
                 print("⛔ No live…")
 
